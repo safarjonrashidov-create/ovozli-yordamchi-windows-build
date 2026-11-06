@@ -1,0 +1,55 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source archive
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13.17'
+          architecture: x64
+
+      - name: Verify and unpack inspected source archive
+        shell: pwsh
+        run: |
+          $archive = 'OvozliYordamchiWindowsyigishtoplami.zip'
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne 'cd1cc4538ac60543771be74db22378ab897ca6d68f05091dd3a2ba8abb3487c3') { throw 'Source archive SHA-256 mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath source
+
+      - name: Build application without running it
+        working-directory: source/Ovozli Yordamchi
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+        run: python .\Yigish.py
+
+      - name: Preserve attribution and instructions
+        shell: pwsh
+        run: |
+          $target = 'source/Ovozli Yordamchi/dist/Ovozli Yordamchi'
+          foreach ($file in @('LITSENZIYA.md', 'README.md', 'Manbalar.md')) {
+            Copy-Item -LiteralPath (Join-Path 'source/Ovozli Yordamchi' $file) -Destination $target
+          }
+
+      - name: Upload distributable folder
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Ovozli-Yordamchi-Windows-x64
+          path: source/Ovozli Yordamchi/dist/Ovozli Yordamchi/
+          if-no-files-found: error
+          retention-days: 7
